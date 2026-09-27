@@ -1,62 +1,163 @@
-(function() {
-    // Falls bereits ein Schnee-Intervall läuft (Zweiter Klick -> Abbrechen)
-    if (window.sfSnowInterval) {
-        clearInterval(window.sfSnowInterval);
-        window.sfSnowInterval = null;
-        // Alle noch existierenden Flocken sofort löschen
-        document.querySelectorAll('.snowflake').forEach(flake => flake.remove());
-        return; // Skript hier beenden
+(() => {
+  "use strict";
+
+  const EFFECT_KEY = "__sfWinterEffectV2";
+  const STYLE_ID = "sf-winter-effect-styles";
+  const FLAKE_CLASS = "sf-winter-flake";
+  const TOAST_CLASS = "sf-winter-toast";
+  const RUN_TIME_MS = 30_000;
+  const MAX_FLAKES = 95;
+
+  // Zweiter Klick: laufenden Effekt sofort beenden.
+  if (window[EFFECT_KEY]?.cleanup) {
+    window[EFFECT_KEY].cleanup();
+    return;
+  }
+
+  // Nicht gleichzeitig mit dem Geburtstags-Effekt laufen lassen.
+  window.__sfBirthdayEffectV1?.cleanup?.();
+
+  // Reste der ersten Snow-Version aufraeumen, falls sie noch aktiv ist.
+  if (window.sfSnowInterval) {
+    clearInterval(window.sfSnowInterval);
+    window.sfSnowInterval = null;
+  }
+  document.querySelectorAll(".snowflake").forEach((node) => node.remove());
+
+  const state = {
+    interval: null,
+    autoStopTimer: null,
+    finishTimer: null,
+    toastTimer: null,
+    cleanup: null,
+  };
+
+  const cleanup = () => {
+    clearInterval(state.interval);
+    clearTimeout(state.autoStopTimer);
+    clearTimeout(state.finishTimer);
+    clearTimeout(state.toastTimer);
+    document.querySelectorAll(`.${FLAKE_CLASS}, .${TOAST_CLASS}`).forEach((node) => node.remove());
+    document.getElementById(STYLE_ID)?.remove();
+    if (window[EFFECT_KEY] === state) {
+      delete window[EFFECT_KEY];
+    }
+  };
+
+  state.cleanup = cleanup;
+  window[EFFECT_KEY] = state;
+
+  const style = document.createElement("style");
+  style.id = STYLE_ID;
+  style.textContent = `
+    .${FLAKE_CLASS} {
+      position: fixed;
+      top: 0;
+      left: var(--left);
+      z-index: 2147483645;
+      color: var(--color);
+      font-family: "Segoe UI Symbol", "Noto Sans Symbols", sans-serif;
+      font-size: var(--size);
+      line-height: 1;
+      opacity: 0;
+      pointer-events: none;
+      user-select: none;
+      filter: drop-shadow(0 0 3px rgba(0, 112, 242, 0.75))
+              drop-shadow(0 1px 1px rgba(18, 64, 94, 0.35));
+      animation: sfWinterFall var(--duration) linear var(--delay) forwards;
+      will-change: transform, opacity;
     }
 
-    // 1. CSS-Styling für die Schneeflocken in die Seite einfügen
-    if (!document.getElementById('snow-styles')) {
-        const style = document.createElement('style');
-        style.id = 'snow-styles';
-        style.innerHTML = `
-            .snowflake {
-                position: fixed;
-                top: -10px;
-                color: #fff;
-                font-size: 1.5em;
-                font-family: Arial, sans-serif;
-                text-shadow: 0 0 5px rgba(0,0,0,0.3);
-                user-select: none;
-                z-index: 99999;
-                pointer-events: none;
-                animation: fall linear forwards;
-            }
-            @keyframes fall {
-                to { transform: translateY(105vh); }
-            }
-        `;
-        document.head.appendChild(style);
+    .${TOAST_CLASS} {
+      position: fixed;
+      top: 78px;
+      left: 50%;
+      z-index: 2147483646;
+      transform: translateX(-50%);
+      padding: 10px 18px;
+      border: 1px solid rgba(92, 197, 255, 0.85);
+      border-radius: 999px;
+      background: linear-gradient(135deg, rgba(13, 64, 104, 0.94), rgba(18, 121, 178, 0.94));
+      color: #ecfaff;
+      box-shadow: 0 8px 24px rgba(0, 73, 121, 0.3);
+      font: 600 15px/1.2 Arial, sans-serif;
+      letter-spacing: 0.2px;
+      pointer-events: none;
+      animation: sfWinterToast 2.8s ease both;
     }
 
-    // 2. Funktion für eine einzelne Schneeflocke
-    function createSnowflake() {
-        const flake = document.createElement('div');
-        flake.className = 'snowflake';
-        flake.innerHTML = '❄';
-        
-        flake.style.left = Math.random() * 100 + 'vw';
-        flake.style.opacity = Math.random();
-        const duration = Math.random() * 3 + 2; // 2 bis 5 Sekunden Fallzeit
-        flake.style.animationDuration = duration + 's';
-        
-        document.body.appendChild(flake);
-        
-        // Flocke löschen, wenn sie unten ankommt
-        setTimeout(() => { flake.remove(); }, duration * 1000);
+    @keyframes sfWinterFall {
+      0% {
+        transform: translate3d(0, -14vh, 0) rotate(0deg);
+        opacity: 0;
+      }
+      7% { opacity: var(--opacity); }
+      50% {
+        transform: translate3d(var(--drift-half), 52vh, 0) rotate(var(--rotation-half));
+        opacity: var(--opacity);
+      }
+      100% {
+        transform: translate3d(var(--drift), 112vh, 0) rotate(var(--rotation));
+        opacity: 0.9;
+      }
     }
 
-    // 3. Schnee starten und das Intervall global speichern
-    window.sfSnowInterval = setInterval(createSnowflake, 200);
-    
-    // 4. Nach exakt 30 Sekunden automatisch stoppen
-    setTimeout(() => {
-        if (window.sfSnowInterval) {
-            clearInterval(window.sfSnowInterval);
-            window.sfSnowInterval = null;
-        }
-    }, 30000);
+    @keyframes sfWinterToast {
+      0% { opacity: 0; transform: translate(-50%, -12px) scale(0.96); }
+      15%, 78% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+      100% { opacity: 0; transform: translate(-50%, -8px) scale(0.98); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .${FLAKE_CLASS} { animation-duration: 14s; }
+    }
+  `;
+  document.head.appendChild(style);
+
+  const colors = ["#4aa8e8", "#60c6f2", "#7fd4ff", "#9ee4ff", "#c1f0ff"];
+  const symbols = ["❄", "❅", "❆"];
+
+  const createFlake = (prefill = false) => {
+    if (document.querySelectorAll(`.${FLAKE_CLASS}`).length >= MAX_FLAKES) return;
+
+    const flake = document.createElement("span");
+    const size = 22 + Math.random() * 32;
+    const duration = 7.5 + Math.random() * 5;
+    const drift = -110 + Math.random() * 220;
+    const rotation = (Math.random() > 0.5 ? 1 : -1) * (300 + Math.random() * 540);
+
+    flake.className = FLAKE_CLASS;
+    flake.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+    flake.setAttribute("aria-hidden", "true");
+    flake.style.setProperty("--left", `${Math.random() * 100}vw`);
+    flake.style.setProperty("--size", `${size.toFixed(1)}px`);
+    flake.style.setProperty("--duration", `${duration.toFixed(2)}s`);
+    flake.style.setProperty("--delay", prefill ? `${(-Math.random() * duration).toFixed(2)}s` : "0s");
+    flake.style.setProperty("--drift", `${drift.toFixed(1)}px`);
+    flake.style.setProperty("--drift-half", `${(drift * 0.45).toFixed(1)}px`);
+    flake.style.setProperty("--rotation", `${rotation.toFixed(0)}deg`);
+    flake.style.setProperty("--rotation-half", `${(rotation * 0.46).toFixed(0)}deg`);
+    flake.style.setProperty("--opacity", `${(0.76 + Math.random() * 0.24).toFixed(2)}`);
+    flake.style.setProperty("--color", colors[Math.floor(Math.random() * colors.length)]);
+    flake.addEventListener("animationend", () => flake.remove(), { once: true });
+    document.body.appendChild(flake);
+  };
+
+  const toast = document.createElement("div");
+  toast.className = TOAST_CLASS;
+  toast.textContent = "❄ Wintermodus aktiviert";
+  toast.setAttribute("role", "status");
+  document.body.appendChild(toast);
+  state.toastTimer = setTimeout(() => toast.remove(), 2_900);
+
+  // Sofort eine gefuellte Schneeszene zeigen, danach gleichmaessig nachliefern.
+  for (let i = 0; i < 34; i += 1) createFlake(true);
+  state.interval = setInterval(() => createFlake(false), 120);
+
+  state.autoStopTimer = setTimeout(() => {
+    clearInterval(state.interval);
+    state.interval = null;
+    // Die letzten Flocken duerfen noch zu Ende fallen.
+    state.finishTimer = setTimeout(cleanup, 13_000);
+  }, RUN_TIME_MS);
 })();
