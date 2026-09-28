@@ -5,7 +5,7 @@
   const STYLE_ID = "sf-winter-effect-styles";
   const FLAKE_CLASS = "sf-winter-flake";
   const TOAST_CLASS = "sf-winter-toast";
-  const RUN_TIME_MS = 30_000;
+  const RUN_TIME_MS = 120_000;
   const MAX_FLAKES = 95;
 
   // Zweiter Klick: laufenden Effekt sofort beenden.
